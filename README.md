@@ -20,14 +20,8 @@
    - `RG=<your-resource-group>`
    - `LAW=<your-workspace-name>`
    - `WID=$(az monitor log-analytics workspace show -g "$RG" -n "$LAW" --query id -o tsv)`
-   - Alternatively, 
-4) Run the capture (recommended profile: aks-debug):
+5) Run the capture (recommended profile: aks-debug):
    - `./bin/aks-must-gather --workspace-id "$WID" --timespan PT15M --profiles aks-debug --out ./must-gather.tar.gz`
-5) Inspect the artifact:
-   - List contents without extracting: `tar -tzf ./must-gather.tar.gz | head -n 60`
-   - Optional: extract to a clean folder (recommended):
-     - `mkdir -p ./artifacts && tar -C ./artifacts -xzf ./must-gather.tar.gz`
-     - This avoids creating folders in the repo root (e.g., `./tmp`).
 
 
 ### Usage (Flags)
