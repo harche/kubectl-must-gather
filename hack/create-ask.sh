@@ -52,7 +52,7 @@ LOG_ANALYTICS_WORKSPACE_GUID=$(az monitor log-analytics workspace show \
   --query customerId -o tsv)
 
 # -------------------------
-# AKS cluster (Azure Monitor enabled, linked to the workspace)
+# AKS cluster (Azure Monitor v2 enabled with managed identity)
 # -------------------------
 echo "--- Creating AKS Cluster: $AKS_CLUSTER_NAME ---"
 az aks create \
@@ -60,8 +60,10 @@ az aks create \
   --name "$AKS_CLUSTER_NAME" \
   --location "$LOCATION" \
   --node-count 1 \
+  --enable-managed-identity \
   --enable-addons monitoring \
   --workspace-resource-id "$LOG_ANALYTICS_WORKSPACE_RESOURCE_ID" \
+  --enable-azure-monitor-metrics \
   --generate-ssh-keys \
   >/dev/null
 
@@ -72,15 +74,15 @@ az aks wait -g "$RESOURCE_GROUP" -n "$AKS_CLUSTER_NAME" --created
 az aks get-credentials -g "$RESOURCE_GROUP" -n "$AKS_CLUSTER_NAME" --overwrite-existing >/dev/null
 
 # -------------------------
-# Verify ContainerLog table appears in LA (agent warm-up)
+# Verify Container Insights v2 tables appear in LA (agent warm-up)
 # -------------------------
-echo "--- Verifying creation of Container log table in Log Analytics Workspace ---"
+echo "--- Verifying creation of Container Insights v2 tables in Log Analytics Workspace ---"
 TABLE_CHECK_TIMEOUT_SECONDS=900 # 15 minutes
 CHECK_INTERVAL_SECONDS=30
 SECONDS_WAITED=0
 
 while true; do
-  # Newer AKS/Container Insights deployments use ContainerLogV2; older use ContainerLog.
+  # Container Insights v2 uses ContainerLogV2 as primary table
   if az monitor log-analytics query \
       --workspace "$LOG_ANALYTICS_WORKSPACE_GUID" \
       --analytics-query "ContainerLogV2 | take 1" \
@@ -89,19 +91,21 @@ while true; do
     break
   fi
 
+  # Fallback check for legacy ContainerLog table
   if az monitor log-analytics query \
       --workspace "$LOG_ANALYTICS_WORKSPACE_GUID" \
       --analytics-query "ContainerLog | take 1" \
       --output none >/dev/null 2>&1; then
-    echo "✅ 'ContainerLog' table found in Log Analytics Workspace."
+    echo "✅ 'ContainerLog' table found in Log Analytics Workspace (legacy format)."
     break
   fi
+  
   if [ $SECONDS_WAITED -ge $TABLE_CHECK_TIMEOUT_SECONDS ]; then
     echo "❌ Timed out waiting for Container log table to be created in Log Analytics."
-    echo "   Check the AKS monitoring addon status on cluster '$AKS_CLUSTER_NAME'."
+    echo "   Check the AKS monitoring addon and Azure Monitor metrics status on cluster '$AKS_CLUSTER_NAME'."
     exit 1
   fi
-  echo "Table not yet found. Waiting ${CHECK_INTERVAL_SECONDS}s before retrying... (${SECONDS_WAITED}/${TABLE_CHECK_TIMEOUT_SECONDS}s)"
+  echo "Container Insights tables not yet found. Waiting ${CHECK_INTERVAL_SECONDS}s before retrying... (${SECONDS_WAITED}/${TABLE_CHECK_TIMEOUT_SECONDS}s)"
   sleep $CHECK_INTERVAL_SECONDS
   SECONDS_WAITED=$((SECONDS_WAITED + CHECK_INTERVAL_SECONDS))
 
@@ -111,5 +115,7 @@ done
 # Done
 # -------------------------
 echo "--- ✅ Setup Complete! ---"
-echo "AKS cluster '$AKS_CLUSTER_NAME' is linked to Log Analytics workspace '$LOG_ANALYTICS_WORKSPACE_NAME'."
-echo "Container logs should begin flowing into 'ContainerLogV2' (or 'ContainerLog')."
+echo "AKS cluster '$AKS_CLUSTER_NAME' is configured with Container Insights v2 and Azure Monitor metrics."
+echo "Logs and metrics are flowing to Log Analytics workspace '$LOG_ANALYTICS_WORKSPACE_NAME'."
+echo "Container logs: 'ContainerLogV2' table"
+echo "Prometheus metrics: Available via Azure Monitor managed service"
