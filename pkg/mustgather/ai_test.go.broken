@@ -1,0 +1,278 @@
+package mustgather
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+func TestBuildKQLPrompt(t *testing.T) {
+	ai := &AIQueryGenerator{}
+	
+	userQuery := "Show me failed pods"
+	availableTables := []string{"KubePodInventory", "KubeEvents", "ContainerLogV2"}
+	
+	prompt := ai.buildKQLPrompt(userQuery, availableTables)
+	
+	// Check that the prompt contains expected elements
+	if !strings.Contains(prompt, userQuery) {
+		t.Errorf("Prompt should contain user query '%s'", userQuery)
+	}
+	
+	if !strings.Contains(prompt, "KubePodInventory") {
+		t.Error("Prompt should contain available tables")
+	}
+	
+	if !strings.Contains(prompt, "docs/tables/") {
+		t.Error("Prompt should reference table documentation")
+	}
+	
+	if !strings.Contains(prompt, "JSON") {
+		t.Error("Prompt should request JSON response")
+	}
+}
+
+func TestBuildFixPrompt(t *testing.T) {
+	ai := &AIQueryGenerator{}
+	
+	userQuery := "Show me pods"
+	brokenQuery := "KubePodInventory | where invalid_column == 'test'"
+	errorMessage := "Column 'invalid_column' not found"
+	availableTables := []string{"KubePodInventory", "KubeEvents"}
+	
+	prompt := ai.buildFixPrompt(userQuery, brokenQuery, errorMessage, availableTables)
+	
+	// Check that all required elements are in the prompt
+	if !strings.Contains(prompt, userQuery) {
+		t.Errorf("Fix prompt should contain original user query '%s'", userQuery)
+	}
+	
+	if !strings.Contains(prompt, brokenQuery) {
+		t.Errorf("Fix prompt should contain broken query '%s'", brokenQuery)
+	}
+	
+	if !strings.Contains(prompt, errorMessage) {
+		t.Errorf("Fix prompt should contain error message '%s'", errorMessage)
+	}
+	
+	if !strings.Contains(prompt, "fix_explanation") {
+		t.Error("Fix prompt should request fix explanation in JSON schema")
+	}
+}
+
+func TestKQLResponseJSONParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonStr  string
+		expected KQLResponse
+		hasError bool
+	}{
+		{
+			name: "Valid response with all fields",
+			jsonStr: `{
+				"kql": "KubePodInventory | take 10",
+				"tables_used": ["KubePodInventory"],
+				"fix_explanation": "Fixed column name"
+			}`,
+			expected: KQLResponse{
+				KQL:            "KubePodInventory | take 10",
+				TablesUsed:     []string{"KubePodInventory"},
+				FixExplanation: "Fixed column name",
+			},
+			hasError: false,
+		},
+		{
+			name: "Valid response without fix explanation",
+			jsonStr: `{
+				"kql": "ContainerLogV2 | where TimeGenerated > ago(1h)",
+				"tables_used": ["ContainerLogV2"]
+			}`,
+			expected: KQLResponse{
+				KQL:            "ContainerLogV2 | where TimeGenerated > ago(1h)",
+				TablesUsed:     []string{"ContainerLogV2"},
+				FixExplanation: "",
+			},
+			hasError: false,
+		},
+		{
+			name: "Multiple tables",
+			jsonStr: `{
+				"kql": "KubePodInventory | join KubeEvents on $left.Name == $right.ObjectName",
+				"tables_used": ["KubePodInventory", "KubeEvents"]
+			}`,
+			expected: KQLResponse{
+				KQL:        "KubePodInventory | join KubeEvents on $left.Name == $right.ObjectName",
+				TablesUsed: []string{"KubePodInventory", "KubeEvents"},
+			},
+			hasError: false,
+		},
+		{
+			name:     "Invalid JSON",
+			jsonStr:  `{"kql": "invalid json structure"`,
+			hasError: true,
+		},
+		{
+			name:     "Missing required fields",
+			jsonStr:  `{"some_other_field": "value"}`,
+			expected: KQLResponse{}, // Should still parse but have empty required fields
+			hasError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result KQLResponse
+			err := json.Unmarshal([]byte(tt.jsonStr), &result)
+			
+			if tt.hasError {
+				if err == nil {
+					t.Error("Expected JSON parsing error but got none")
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("Unexpected JSON parsing error: %v", err)
+				return
+			}
+			
+			if result.KQL != tt.expected.KQL {
+				t.Errorf("Expected KQL '%s', got '%s'", tt.expected.KQL, result.KQL)
+			}
+			
+			if len(result.TablesUsed) != len(tt.expected.TablesUsed) {
+				t.Errorf("Expected %d tables, got %d", len(tt.expected.TablesUsed), len(result.TablesUsed))
+			} else {
+				for i, table := range tt.expected.TablesUsed {
+					if result.TablesUsed[i] != table {
+						t.Errorf("Expected table[%d] '%s', got '%s'", i, table, result.TablesUsed[i])
+					}
+				}
+			}
+			
+			if result.FixExplanation != tt.expected.FixExplanation {
+				t.Errorf("Expected fix explanation '%s', got '%s'", tt.expected.FixExplanation, result.FixExplanation)
+			}
+		})
+	}
+}
+
+func TestExtractKQLFromComplexResponses(t *testing.T) {
+	ai := &AIQueryGenerator{}
+
+	tests := []struct {
+		name     string
+		response string
+		expected string
+	}{
+		{
+			name: "Claude response with explanation and JSON",
+			response: `I'll create a KQL query to show failed pods:
+
+{
+  "kql": "KubePodInventory | where PodStatus == 'Failed' | project Name, Namespace, PodStatus",
+  "tables_used": ["KubePodInventory"]
+}
+
+This query filters for pods with Failed status.`,
+			expected: "KubePodInventory | where PodStatus == 'Failed' | project Name, Namespace, PodStatus",
+		},
+		{
+			name: "Response with nested JSON",
+			response: `{
+  "kql": "KubeEvents | where ObjectKind == 'Pod' | where Reason contains 'Failed'",
+  "tables_used": ["KubeEvents"],
+  "metadata": {
+    "complexity": "simple",
+    "estimated_rows": 100
+  }
+}`,
+			expected: "KubeEvents | where ObjectKind == 'Pod' | where Reason contains 'Failed'",
+		},
+		{
+			name: "Malformed JSON fallback",
+			response: `Here's your query:
+KubePodInventory 
+| where Namespace == "default"
+| take 10
+
+This should work well.`,
+			expected: "KubePodInventory\n| where Namespace == \"default\"\n| take 10\nThis should work well.",
+		},
+		{
+			name: "Mixed content with KQL block",
+			response: `Based on your request, here's the query:
+
+```kql
+ContainerLogV2 
+| where PodName contains "failed"
+| project TimeGenerated, PodName, LogMessage
+```
+
+The query searches for container logs.`,
+			expected: "ContainerLogV2\n| where PodName contains \"failed\"\n| project TimeGenerated, PodName, LogMessage",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ai.extractKQLFromResponse(tt.response)
+			if result != tt.expected {
+				t.Errorf("Expected:\n%s\n\nGot:\n%s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// Test the prompt building functions with edge cases
+func TestPromptBuildingEdgeCases(t *testing.T) {
+	ai := &AIQueryGenerator{}
+	
+	tests := []struct {
+		name            string
+		userQuery       string
+		availableTables []string
+		shouldPanic     bool
+	}{
+		{
+			name:            "Empty user query",
+			userQuery:       "",
+			availableTables: []string{"KubePodInventory"},
+			shouldPanic:     false,
+		},
+		{
+			name:            "Empty tables list",
+			userQuery:       "Show me pods",
+			availableTables: []string{},
+			shouldPanic:     false,
+		},
+		{
+			name:            "Very long user query",
+			userQuery:       strings.Repeat("Show me pods with very detailed filters and conditions ", 50),
+			availableTables: []string{"KubePodInventory"},
+			shouldPanic:     false,
+		},
+		{
+			name:            "Special characters in query",
+			userQuery:       "Show me pods with 'quotes' and \"double quotes\" and \n newlines \t tabs",
+			availableTables: []string{"KubePodInventory"},
+			shouldPanic:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil && !tt.shouldPanic {
+					t.Errorf("Unexpected panic: %v", r)
+				}
+			}()
+			
+			prompt := ai.buildKQLPrompt(tt.userQuery, tt.availableTables)
+			if len(prompt) == 0 {
+				t.Error("Prompt should not be empty")
+			}
+		})
+	}
+}

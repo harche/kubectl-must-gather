@@ -8,7 +8,7 @@ GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOFMT=gofmt
-BINARY_NAME=kubectl-must-gather
+BINARY_NAME=aks-must-gather
 MAIN_PATH=./cmd/aks-must-gather
 
 # Build directory

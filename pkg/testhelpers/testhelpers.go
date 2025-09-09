@@ -13,11 +13,11 @@ import (
 
 // TarEntry represents a file in a tar archive for testing
 type TarEntry struct {
-	Path     string
-	Content  string
-	Mode     int64
-	IsDir    bool
-	ModTime  time.Time
+	Path    string
+	Content string
+	Mode    int64
+	IsDir   bool
+	ModTime time.Time
 }
 
 // CreateTestTar creates a tar.gz archive with the given entries for testing
@@ -155,11 +155,11 @@ func ValidateWorkspaceIDFormat(workspaceID string) bool {
 	}
 
 	expectedParts := map[string]bool{
-		"subscriptions":                           false,
-		"resourcegroups":                          false,
-		"providers":                               false,
-		"microsoft.operationalinsights":           false,
-		"workspaces":                              false,
+		"subscriptions":                 false,
+		"resourcegroups":                false,
+		"providers":                     false,
+		"microsoft.operationalinsights": false,
+		"workspaces":                    false,
 	}
 
 	for _, part := range parts {
@@ -181,7 +181,7 @@ func ValidateWorkspaceIDFormat(workspaceID string) bool {
 // CreateMockTableData creates mock table data for testing
 func CreateMockTableData(tableName string, rowCount int) []map[string]interface{} {
 	rows := make([]map[string]interface{}, rowCount)
-	
+
 	for i := 0; i < rowCount; i++ {
 		row := map[string]interface{}{
 			"TimeGenerated": time.Now().Add(-time.Duration(i) * time.Minute).Format(time.RFC3339),
@@ -218,7 +218,7 @@ func CreateMockTableData(tableName string, rowCount int) []map[string]interface{
 // AssertStringSliceEqual compares two string slices for equality
 func AssertStringSliceEqual(t *testing.T, expected, actual []string, msgAndArgs ...interface{}) {
 	if len(expected) != len(actual) {
-		t.Errorf("slice length mismatch: expected %d, got %d. Expected: %v, Actual: %v", 
+		t.Errorf("slice length mismatch: expected %d, got %d. Expected: %v, Actual: %v",
 			len(expected), len(actual), expected, actual)
 		return
 	}

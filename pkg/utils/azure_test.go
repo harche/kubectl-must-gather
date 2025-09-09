@@ -7,12 +7,12 @@ import (
 
 func TestParseResourceID(t *testing.T) {
 	tests := []struct {
-		name           string
-		resourceID     string
-		expectedSub    string
-		expectedRG     string
-		expectedWS     string
-		expectedError  bool
+		name          string
+		resourceID    string
+		expectedSub   string
+		expectedRG    string
+		expectedWS    string
+		expectedError bool
 	}{
 		{
 			name:          "valid resource ID",

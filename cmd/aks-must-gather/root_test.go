@@ -45,8 +45,8 @@ func TestRootCommandFlags(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "help flag",
-			args: []string{"--help"},
+			name:        "help flag",
+			args:        []string{"--help"},
 			expectError: false,
 		},
 	}
@@ -55,17 +55,17 @@ func TestRootCommandFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a new command for each test to avoid state pollution
 			cmd := createTestRootCommand()
-			
+
 			// Capture output
 			var stdout, stderr bytes.Buffer
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stderr)
-			
+
 			// Set args
 			cmd.SetArgs(tt.args)
-			
+
 			err := cmd.Execute()
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -75,7 +75,7 @@ func TestRootCommandFlags(t *testing.T) {
 				}
 				return
 			}
-			
+
 			// For help command, we expect success but no actual execution
 			if len(tt.args) > 0 && tt.args[0] == "--help" {
 				if err != nil {
@@ -87,7 +87,7 @@ func TestRootCommandFlags(t *testing.T) {
 				}
 				return
 			}
-			
+
 			// For other valid commands, we expect them to fail at runtime (no Azure creds)
 			// but not due to flag parsing issues
 			if err != nil && strings.Contains(err.Error(), "required flag") {
@@ -115,18 +115,18 @@ func TestRootCommandFlagDefaults(t *testing.T) {
 	}
 
 	cmd := createTestRootCommand()
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			flag := cmd.Flags().Lookup(tt.flagName)
 			if flag == nil {
 				t.Fatalf("flag %q not found", tt.flagName)
 			}
-			
+
 			if flag.Value.Type() != tt.expectedType {
 				t.Errorf("expected flag %q to be type %q, got %q", tt.flagName, tt.expectedType, flag.Value.Type())
 			}
-			
+
 			if tt.hasDefault && flag.DefValue == "" {
 				t.Errorf("expected flag %q to have a default value", tt.flagName)
 			}
@@ -136,11 +136,11 @@ func TestRootCommandFlagDefaults(t *testing.T) {
 
 func TestRootCommandDescription(t *testing.T) {
 	cmd := createTestRootCommand()
-	
+
 	tests := []struct {
-		name      string
-		field     string
-		value     string
+		name          string
+		field         string
+		value         string
 		shouldContain string
 	}{
 		{
@@ -162,7 +162,7 @@ func TestRootCommandDescription(t *testing.T) {
 			shouldContain: "Azure Log Analytics workspace",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if !strings.Contains(tt.value, tt.shouldContain) {
@@ -174,18 +174,18 @@ func TestRootCommandDescription(t *testing.T) {
 
 func TestRootCommandFlagUsage(t *testing.T) {
 	cmd := createTestRootCommand()
-	
+
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 	cmd.SetArgs([]string{"--help"})
-	
+
 	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("help command failed: %v", err)
 	}
-	
+
 	helpText := output.String()
-	
+
 	expectedFlags := []string{
 		"--workspace-id",
 		"--timespan",
@@ -197,13 +197,13 @@ func TestRootCommandFlagUsage(t *testing.T) {
 		"--stitch-include-events",
 		"--help",
 	}
-	
+
 	for _, flag := range expectedFlags {
 		if !strings.Contains(helpText, flag) {
 			t.Errorf("help text should contain flag %q", flag)
 		}
 	}
-	
+
 	// Check that flag descriptions are present
 	expectedDescriptions := []string{
 		"Log Analytics workspace ARM resource ID",
@@ -215,7 +215,7 @@ func TestRootCommandFlagUsage(t *testing.T) {
 		"time-ordered logs",
 		"Include KubeEvents",
 	}
-	
+
 	for _, desc := range expectedDescriptions {
 		if !strings.Contains(helpText, desc) {
 			t.Errorf("help text should contain description %q", desc)
@@ -226,14 +226,14 @@ func TestRootCommandFlagUsage(t *testing.T) {
 func TestExecuteFunction(t *testing.T) {
 	// Test that Execute function exists and can be called
 	// We can't test actual execution without mocking Azure services
-	
+
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
-	
+
 	// Test with help flag to avoid actual execution
 	os.Args = []string{"aks-must-gather", "--help"}
-	
+
 	// This should not panic or cause issues
 	err := Execute()
 	if err != nil {
@@ -265,22 +265,22 @@ func TestRootCommandValidation(t *testing.T) {
 			expectError: false, // The flag validation will pass, but runtime validation would fail
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := createTestRootCommand()
-			
+
 			var stderr bytes.Buffer
 			cmd.SetErr(&stderr)
-			
+
 			args := []string{}
 			if tt.workspaceID != "" {
 				args = append(args, "--workspace-id", tt.workspaceID)
 			}
-			
+
 			cmd.SetArgs(args)
 			err := cmd.Execute()
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -379,7 +379,7 @@ func TestRootCommandFlagInteractions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := createTestRootCommand()
 			cmd.SetArgs(tt.args)
-			
+
 			err := cmd.Execute()
 			// We expect this to succeed in flag parsing (validation errors are OK for actual execution)
 			if err != nil && strings.Contains(err.Error(), "required flag") {

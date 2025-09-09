@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,17 +19,29 @@ var (
 	allTables           bool
 	stitchLogs          bool
 	stitchIncludeEvents bool
+	aiQuery             string
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "aks-must-gather",
-	Short: "Collect diagnostic data from Azure Log Analytics workspace",
+	Short: "Collect diagnostic data from Azure Log Analytics workspace with AI-powered querying",
 	Long: `aks-must-gather is a tool that collects diagnostic data from an Azure Log Analytics workspace
 and packages it into a tar.gz file for analysis. It supports various profiles and can export
-specific tables or all tables from the workspace.`,
+specific tables or all tables from the workspace.
+
+With --ai-mode, you can use natural language queries to generate KQL queries and get targeted 
+results without creating tar files. Requires 'claude' command to be available in PATH.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if workspaceID == "" {
 			return fmt.Errorf("must provide --workspace-id (workspace ARM resource ID)")
+		}
+
+		// Handle AI mode
+		if aiQuery != "" {
+			aiQuery = strings.TrimSpace(aiQuery)
+			if aiQuery == "" {
+				return fmt.Errorf("AI query cannot be empty")
+			}
 		}
 
 		config := &mustgather.Config{
@@ -40,6 +53,8 @@ specific tables or all tables from the workspace.`,
 			AllTables:           allTables,
 			StitchLogs:          stitchLogs,
 			StitchIncludeEvents: stitchIncludeEvents,
+			AIMode:              aiQuery != "",
+			AIQuery:             aiQuery,
 		}
 
 		ctx := context.Background()
@@ -61,6 +76,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&allTables, "all-tables", false, "Export all tables in the workspace (may be slow). Overrides profiles/tables if used.")
 	rootCmd.Flags().BoolVar(&stitchLogs, "stitch-logs", true, "Also include time-ordered logs per namespace/pod/container under namespaces/ folder")
 	rootCmd.Flags().BoolVar(&stitchIncludeEvents, "stitch-include-events", true, "Include KubeEvents under namespaces/<ns>/events/events.log")
+	rootCmd.Flags().StringVar(&aiQuery, "ai-mode", "", "Enable AI-powered query mode with natural language query (e.g., --ai-mode \"show me failed pods\")")
 
 	rootCmd.MarkFlagRequired("workspace-id")
 }

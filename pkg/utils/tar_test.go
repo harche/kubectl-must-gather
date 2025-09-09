@@ -179,7 +179,7 @@ func TestWriteStreamToTarErrorHandling(t *testing.T) {
 	// Create a reader that will fail
 	errorReader := &errorReader{}
 	err := WriteStreamToTar(tw, "test.txt", errorReader)
-	
+
 	if err == nil {
 		t.Error("expected error from WriteStreamToTar with failing reader")
 	}
@@ -194,8 +194,8 @@ func TestWriteFileToTarMultipleFiles(t *testing.T) {
 	tw := tar.NewWriter(&buf)
 
 	files := map[string][]byte{
-		"file1.txt":        []byte("content1"),
-		"dir/file2.txt":    []byte("content2"),
+		"file1.txt":         []byte("content1"),
+		"dir/file2.txt":     []byte("content2"),
 		"dir/sub/file3.txt": []byte("content3"),
 	}
 

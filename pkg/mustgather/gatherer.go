@@ -22,16 +22,28 @@ import (
 
 type ckey struct{ ns, pod, container string }
 
+type GathererInterface interface {
+	Run() error
+}
+
 type Gatherer struct {
 	config *Config
 	ctx    context.Context
 	cred   *azidentity.DefaultAzureCredential
 }
 
-func NewGatherer(ctx context.Context, config *Config) (*Gatherer, error) {
+func NewGatherer(ctx context.Context, config *Config) (GathererInterface, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init credential: %w", err)
+	}
+
+	if config.AIMode {
+		return &AIGatherer{
+			config: config,
+			ctx:    ctx,
+			cred:   cred,
+		}, nil
 	}
 
 	return &Gatherer{
@@ -116,11 +128,11 @@ func (g *Gatherer) Run() error {
 
 	// Write metadata
 	meta := map[string]any{
-		"generatedAt":    time.Now().UTC().Format(time.RFC3339Nano),
-		"workspaceGUID":  workspaceGUID,
-		"workspaceID":    g.config.WorkspaceID,
-		"timespan":       iso,
-		"tablesCount":    len(tables),
+		"generatedAt":   time.Now().UTC().Format(time.RFC3339Nano),
+		"workspaceGUID": workspaceGUID,
+		"workspaceID":   g.config.WorkspaceID,
+		"timespan":      iso,
+		"tablesCount":   len(tables),
 	}
 	metaBytes, _ := json.MarshalIndent(meta, "", "  ")
 	_ = utils.WriteFileToTar(tarw, "metadata/workspace.json", metaBytes)

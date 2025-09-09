@@ -47,7 +47,7 @@ func TestGetDefaultProfiles(t *testing.T) {
 
 	// Test that aks-debug is a union of podLogs, inventory, and metrics
 	aksDebugTables := profiles["aks-debug"]
-	
+
 	// Create a set to check for all expected tables
 	expectedTables := make(map[string]bool)
 	for _, table := range expectedPodLogs {
@@ -83,10 +83,10 @@ func TestGetDefaultProfiles(t *testing.T) {
 
 func TestConfigGenerateDefaultOutputName(t *testing.T) {
 	tests := []struct {
-		name           string
-		outputFile     string
-		expectDefault  bool
-		expectPattern  string
+		name          string
+		outputFile    string
+		expectDefault bool
+		expectPattern string
 	}{
 		{
 			name:          "empty output file",
@@ -180,7 +180,7 @@ func TestConfigValidation(t *testing.T) {
 			if tt.config.WorkspaceID == "" && tt.valid {
 				t.Errorf("valid config should have WorkspaceID")
 			}
-			
+
 			if tt.config.Timespan == "" && tt.valid {
 				t.Errorf("valid config should have Timespan")
 			}
@@ -239,7 +239,7 @@ func TestTimestampGeneration(t *testing.T) {
 	// Format: must-gather-20060102-150405.tar.gz
 	prefix := "must-gather-"
 	suffix := ".tar.gz"
-	
+
 	if !strings.HasPrefix(output, prefix) || !strings.HasSuffix(output, suffix) {
 		t.Fatalf("unexpected output format: %q", output)
 	}

@@ -203,11 +203,11 @@ func TestValidateWorkspaceIDFormat(t *testing.T) {
 
 func TestMockWorkspaceID(t *testing.T) {
 	workspaceID := MockWorkspaceID()
-	
+
 	if workspaceID == "" {
 		t.Error("MockWorkspaceID should not return empty string")
 	}
-	
+
 	if !ValidateWorkspaceIDFormat(workspaceID) {
 		t.Errorf("MockWorkspaceID should return valid format, got: %s", workspaceID)
 	}
@@ -228,21 +228,21 @@ func TestCreateMockTableData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := CreateMockTableData(tt.tableName, tt.rowCount)
-			
+
 			if len(data) != tt.rowCount {
 				t.Errorf("expected %d rows, got %d", tt.rowCount, len(data))
 			}
-			
+
 			for i, row := range data {
 				// Check common fields
 				if row["TableName"] != tt.tableName {
 					t.Errorf("row %d: expected TableName %q, got %q", i, tt.tableName, row["TableName"])
 				}
-				
+
 				if row["RowIndex"] != i {
 					t.Errorf("row %d: expected RowIndex %d, got %v", i, i, row["RowIndex"])
 				}
-				
+
 				// Check table-specific fields
 				switch tt.tableName {
 				case "ContainerLogV2":
@@ -334,20 +334,20 @@ func TestNewMockTimeRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			timeRange := NewMockTimeRange(tt.hoursAgo)
-			
+
 			duration := timeRange.End.Sub(timeRange.Start)
 			expectedDuration := time.Duration(tt.hoursAgo) * time.Hour
-			
+
 			if duration != expectedDuration {
 				t.Errorf("expected duration %v, got %v", expectedDuration, duration)
 			}
-			
+
 			// Check that end time is roughly now
 			now := time.Now().UTC()
 			if timeRange.End.Sub(now) > time.Minute {
 				t.Errorf("end time should be close to now, got difference: %v", timeRange.End.Sub(now))
 			}
-			
+
 			// Test ISO8601 formatting
 			iso := timeRange.FormatISO8601()
 			expectedISO := fmt.Sprintf("PT%dH0M0S", tt.hoursAgo)
@@ -402,11 +402,11 @@ func TestTestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.builderFunc(NewTestConfig())
-			
+
 			if config.WorkspaceID != tt.expectedWS {
 				t.Errorf("expected WorkspaceID %q, got %q", tt.expectedWS, config.WorkspaceID)
 			}
-			
+
 			if config.Timespan != tt.expectedSpan {
 				t.Errorf("expected Timespan %q, got %q", tt.expectedSpan, config.Timespan)
 			}

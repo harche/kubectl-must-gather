@@ -3,14 +3,16 @@ package mustgather
 import "time"
 
 type Config struct {
-	WorkspaceID       string
-	Timespan          string
-	OutputFile        string
-	TableFilter       string
-	Profiles          string
-	AllTables         bool
-	StitchLogs        bool
+	WorkspaceID         string
+	Timespan            string
+	OutputFile          string
+	TableFilter         string
+	Profiles            string
+	AllTables           bool
+	StitchLogs          bool
 	StitchIncludeEvents bool
+	AIMode              bool
+	AIQuery             string
 }
 
 type ProfileMap map[string][]string

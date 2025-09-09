@@ -5,6 +5,7 @@
 - Queries selected tables over a time window, writes per‑table NDJSON parts and schemas, plus summary metadata.
 - Focus areas: Kubernetes logs, pod/container logs, state/inventory, metrics, and optional control‑plane/audit logs.
 - Requires only the Log Analytics workspace ARM resource ID (`--workspace-id`). The tool resolves other details (GUID, schema) automatically.
+- **AI-powered mode** - Use natural language queries to generate KQL and get targeted results without tar files.  
 
 ### Prerequisites
 - Azure CLI logged in (`az login`) with access to the target workspace/cluster.
@@ -23,10 +24,47 @@
 5) Run the capture (recommended profile: aks-debug):
    - `./bin/aks-must-gather --workspace-id "$WID" --timespan PT15M --profiles aks-debug --out ./must-gather.tar.gz`
 
+## AI-Powered Query Mode (Experimental)
+
+The tool includes an experimental AI-powered mode that lets you ask natural language questions about your AKS cluster. Instead of generating tar files, it creates KQL queries from your questions and provides intelligent analysis of the results.
+
+**Prerequisites for AI mode**: Claude CLI installed and authenticated (`claude` command available in PATH).
+
+### How It Works
+1. **Natural Language Input**: Ask questions in plain English
+2. **KQL Generation**: Claude generates precise KQL queries using current table schemas
+3. **Query Execution**: Runs the query against your Log Analytics workspace  
+4. **AI Analysis**: Claude analyzes the results and provides insights
+5. **Persistent Results**: Saves all data in timestamped directories for manual inspection
+
+### Quick Start with AI Mode
+```bash
+# Deploy demo workloads (creates test-nginx and failing-pod)
+./hack/deploy-demo-workloads.sh
+
+# Wait a few minutes for data to appear in Log Analytics, then:
+./bin/aks-must-gather --workspace-id "$WID" --ai-mode "Show me all pods in ai-test namespace"
+./bin/aks-must-gather --workspace-id "$WID" --ai-mode "Why is my failing-pod not running?"
+```
+
+### Example Natural Language Queries
+- `"Show me all pods in kube-system namespace"`
+- `"Why are my pods failing?"`
+- `"Show me container logs with errors from the last hour"`
+- `"What nodes are having issues?"`
+- `"Show me kubernetes events for failed pods"`
+- `"Which containers have high restart counts?"`
+
+### AI Mode Output
+- **KQL Query**: Shows the generated query for transparency
+- **AI Analysis**: Human-readable insights and recommendations
+- **Persistent Data**: Results saved in `ai-results-YYYYMMDD-HHMMSS/` directories
+- **Raw Data Access**: Full query results available for manual analysis
 
 ### Usage (Flags)
 - `--workspace-id`: Log Analytics workspace ARM resource ID (required). The tool discovers the workspace GUID automatically.
 - `--timespan`: ISO‑8601 (e.g., `PT30M`, `PT2H`, `P1D`) or Go style (`30m`, `2h`).
+- `--ai-mode`: Enable AI-powered query mode. Prompts for natural language query and presents results directly (no tar file).
 - `--profiles`: Comma‑separated profiles (see below). Supports alias `aks-debug` (podLogs+inventory+metrics). Defaults to that union if omitted.
 - `--tables`: Comma‑separated table list. Overrides `--profiles`.
 - `--all-tables`: Export every table in the workspace (can be slow). Overrides profiles/tables.
@@ -83,6 +121,8 @@
 - `index.json`: List of exported tables.
 
 ### Examples
+
+#### Traditional tar.gz export:
 - Pod/container logs only (30 minutes):
   `./bin/aks-must-gather --workspace-id <ARM ID> --timespan PT30M --profiles podLogs --out logs.tar.gz`
 
@@ -94,6 +134,21 @@
 
 - Default AKS debug (alias):
   `./bin/aks-must-gather --workspace-id <ARM ID> --timespan PT30M --profiles aks-debug --out aks-debug.tar.gz`
+
+#### AI-powered mode:
+- Natural language queries with direct input:
+  ```bash
+  ./bin/aks-must-gather --workspace-id <ARM ID> --ai-mode "Show me all pods in ai-test namespace"
+  ./bin/aks-must-gather --workspace-id <ARM ID> --ai-mode "Why is my failing-pod not running?"
+  ./bin/aks-must-gather --workspace-id <ARM ID> --ai-mode "Show me kubernetes events for failed pods"
+  ```
+
+- **Deploy demo workloads for testing:**
+  ```bash
+  ./hack/deploy-demo-workloads.sh
+  ```
+
+- **Sample AI mode session:** [View complete troubleshooting session](https://gist.github.com/harche/9d8bd277973565effbfaefc8d88d37ce) - Shows AI-powered analysis of a crash simulator pod with OOM errors, including KQL generation, validation, and actionable recommendations.
 
 ### Notes
 - `ContainerLogV2` is the primary container log table on modern clusters; `ContainerLog` may be empty.
